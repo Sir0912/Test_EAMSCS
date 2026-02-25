@@ -40,6 +40,16 @@ def landing_page():
 def log_in_admin():
     admin = request.form.get('username')
     password = request.form.get('password')
+    #sql = "SELECT * FROM opti_admin_db WHERE admin_name=%s AND admin_password=%s"
+    #cursor.execute(sql, (admin, password))
+    #acc_f = cursor.fetchone()
+
+    #if acc_f:
+    #    session["admin"] = admin
+    #    return redirect(url_for('admin_dashboard'))
+    #else:
+    #   return redirect(url_for('landing_page'))
+    
     if admin == ADMIN_USERNAME and check_password_hash(ADMIN_PASSWORD_HASH, password):
         session["admin"] = admin
         return redirect(url_for("admin_dashboard"))
