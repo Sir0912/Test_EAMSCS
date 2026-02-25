@@ -2,6 +2,8 @@
 <html>
 <head>
   <title>OPTI Admin Dashboard</title>
+  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <style>
     body { font-family: Arial,sans-serif; margin:0; background:#f4f4f4; }
     .layout { display:flex; height:100vh; }
@@ -16,39 +18,106 @@
     .card { flex:1; background:#f39c12; padding:20px; border-radius:10px; color:#fff; text-align:center; }
     .section { display:none; }
     .section.show { display:block; }
-
-    /* Container for Employees Section */
     .container { display:flex; gap:20px; flex-wrap:wrap; }
-
-    /* Employee Form */
     .employee-form { flex:1; min-width:250px; background:#fff; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.2);}
     .employee-form input, .employee-form select, .employee-form button { width:100%; margin:6px 0; padding:8px; border-radius:6px; border:1px solid #ccc; box-sizing:border-box; }
     .employee-form button { background:#e67e22; color:#fff; font-weight:bold; cursor:pointer; transition:0.3s; }
-    .employee-form button:hover { background:#d35400; transform:scale(1.05); }
-
-    /* Employee Table */
+    .employee-form button:hover { background:#d35400; }
     .employee-table { flex:2; min-width:350px; background:#fff; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.2); max-height:500px; overflow-y:auto; }
     .employee-table table { width:100%; border-collapse:collapse; }
     .employee-table th, .employee-table td { padding:8px; border-bottom:1px solid #ddd; text-align:left; }
     .employee-table th { background:#e67e22; color:#fff; position:sticky; top:0; }
     .employee-table button { background:red; color:#fff; padding:5px 10px; border:none; border-radius:4px; cursor:pointer; }
     .employee-table button:hover { background:darkred; }
-
-    /* Attendance Table */
-    .table-container { max-height:300px; overflow-y:auto; margin-top:10px; border-radius:10px; border:1px solid #ccc; background:#fff; }
+    .table-container { max-height:400px; overflow-y:auto; margin-top:10px; border-radius:10px; border:1px solid #ccc; background:#fff; }
     .table-container table { width:100%; border-collapse:collapse; }
-    .table-container th, .table-container td { padding:8px; border-bottom:1px solid #ddd; text-align:left; }
+    .table-container th, .table-container td { padding:10px; border-bottom:1px solid #ddd; text-align:left; }
     .table-container th { background:#e67e22; color:#fff; position:sticky; top:0; }
-    .table-container tr:hover { background:#f0f0f0; }
     .export-btn { padding:8px 12px; background:#e67e22; color:#fff; border:none; cursor:pointer; margin-bottom:10px; border-radius:6px; }
-    .export-btn:hover { background:#d35400; }
-
+    
+    /* Real-time indicator */
+    .live-dot { width:12px; height:12px; background:#27ae60; border-radius:50%; display:inline-block; margin-right:5px; animation:pulse 1s infinite; }
+    @keyframes pulse { 0% { opacity:1; } 50% { opacity:0.5; } 100% { opacity:1; } }
+    
+    /* Status badges */
+    .badge-time-out { background:#27ae60; color:white; padding:3px 8px; border-radius:4px; }
+    .badge-active { background:#f39c12; color:white; padding:3px 8px; border-radius:4px; }
+    
+    /* Toast notifications */
+    .toast-notification { 
+      position: fixed; 
+      top: 20px; 
+      right: 20px; 
+      z-index: 9999; 
+      color: white; 
+      padding: 15px 20px; 
+      border-radius: 8px; 
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+      min-width: 280px;
+    }
+    .toast-success { background: #27ae60; }
+    .toast-error { background: #e74c3c; }
+    .toast-info { background: #3498db; }
+    
+    /* Settings box */
+    .settings-box { 
+      background: white; 
+      padding: 20px; 
+      border-radius: 10px; 
+      margin-bottom: 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .settings-box h3 { margin-top: 0; color: #2c3e50; }
+    .settings-box input { 
+      width: 100px; 
+      padding: 8px; 
+      border: 1px solid #ccc; 
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    .settings-box button { 
+      padding: 8px 20px; 
+      background: #27ae60; 
+      color: white; 
+      border: none; 
+      border-radius: 4px; 
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .settings-box button:hover { background: #219a52; }
+    
+    /* Modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      text-align: center;
+      width: 350px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+    }
+    .modal-box h3 { color: #e74c3c; margin-top: 0; }
+    .modal-box p { color: #333; font-size: 16px; }
+    .modal-buttons { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
+    .modal-btn { padding: 10px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; }
+    .modal-btn-cancel { background: #95a5a6; color: white; }
+    .modal-btn-confirm { background: #e74c3c; color: white; }
   </style>
 </head>
 <body>
 <div class="layout">
-
-  <!-- Sidebar -->
   <aside class="sidebar">
     <h2 class="logo">OPTI Admin</h2>
     <ul>
@@ -56,14 +125,14 @@
       <li onclick="showSection('attendance')">Attendance</li>
       <li onclick="showSection('salary')">Salary</li>
       <li onclick="showSection('employees')">Employees</li>
+      <li onclick="showSection('settings')">Salary Configuration</li>
       <li><a href="{{ url_for('logout') }}">Logout</a></li>
     </ul>
   </aside>
 
-  <!-- Main Content -->
   <div class="main">
     <div class="topbar">
-      <h1>Admin Dashboard</h1>
+      <h1>Admin Dashboard <span class="live-dot"></span></h1>
       <div class="admin-name">Welcome, {{ admin_name }}</div>
     </div>
 
@@ -71,14 +140,14 @@
     <div id="dashboard" class="section show">
       <div class="stats-container">
         <div class="card"><h3>Total Employees</h3><p>{{ total_employees }}</p></div>
-        <div class="card"><h3>Present Today</h3><p>{{ present_today }}</p></div>
-        <div class="card"><h3>Total Salary Today</h3><p>₱{{ total_salary }}</p></div>
+        <div class="card"><h3>Present Today</h3><p id="present-count">{{ present_today }}</p></div>
+        <div class="card"><h3>Total Salary Today</h3><p>₱<span id="salary-count">{{ total_salary }}</span></p></div>
       </div>
     </div>
 
     <!-- Attendance Section -->
     <div id="attendance" class="section">
-      <h2>Attendance Records</h2>
+      <h2>Attendance Records <span class="live-dot"></span></h2>
       <form action="{{ url_for('export_excel') }}" method="get"><button class="export-btn" type="submit">Export to Excel</button></form>
       <div class="table-container">
         <table>
@@ -87,18 +156,24 @@
               <th>Name</th>
               <th>Time In</th>
               <th>Time Out</th>
-              <th>Duration (Late / Undertime)</th>
-              <th>Salary (₱)</th>
+            
+              <th>Status</th>
             </tr>
           </thead>
           <tbody id="attendance-table">
             {% for r in records %}
-            <tr>
+            <tr id="row-{{ r.id }}">
               <td>{{ r.name }}</td>
-              <td>{{ r.time_in.strftime('%H:%M') if r.time_in else '' }}</td>
-              <td>{{ r.time_out.strftime('%H:%M') if r.time_out else '' }}</td>
-              <td>{{ r.duration }} (Late: {{ r.late_minutes }} / Undertime: {{ r.undertime_minutes }})</td>
-              <td>{{ r.salary }}</td>
+              <td>{{ r.time_in.strftime('%I:%M %p') if r.time_in else '-' }}</td>
+              <td>{{ r.time_out.strftime('%I:%M %p') if r.time_out else '-' }}</td>
+          
+              <td>
+                {% if r.time_out %}
+                <span class="badge-time-out">Completed</span>
+                {% else %}
+                <span class="badge-active">Active</span>
+                {% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -114,20 +189,24 @@
           <thead>
             <tr>
               <th>Name</th>
-              <th>Time In</th>
-              <th>Time Out</th>
-              <th>Duration (Late / Undertime)</th>
+              <th>Duration (min)</th>
               <th>Salary (₱)</th>
+              <th>Status</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="salary-table">
             {% for r in records %}
-            <tr>
+            <tr id="salary-row-{{ r.id }}">
               <td>{{ r.name }}</td>
-              <td>{{ r.time_in.strftime('%H:%M') if r.time_in else '' }}</td>
-              <td>{{ r.time_out.strftime('%H:%M') if r.time_out else '' }}</td>
-              <td>{{ r.duration }} (Late: {{ r.late_minutes }} / Undertime: {{ r.undertime_minutes }})</td>
-              <td>{{ r.salary }}</td>
+              <td>{{ r.duration }} min</td>
+              <td>₱{{ r.salary }}</td>
+              <td>
+                {% if r.time_out %}
+                <span class="badge-time-out">Completed</span>
+                {% else %}
+                <span class="badge-active">Active</span>
+                {% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -139,7 +218,6 @@
     <div id="employees" class="section">
       <h2>Manage Employees</h2>
       <div class="container">
-        <!-- Employee Form -->
         <form class="employee-form" id="employee-form">
           <input type="text" name="name_inp" placeholder="Name" required>
           <input type="number" name="age_inp" placeholder="Age" required>
@@ -153,7 +231,6 @@
           <button type="submit">Add Employee</button>
         </form>
 
-        <!-- Employee Table -->
         <div class="employee-table">
           <table>
             <thead>
@@ -174,7 +251,7 @@
                 <td>{{ e.email }}</td>
                 <td>{{ e.number }}</td>
                 <td>{{ e.rfid }}</td>
-                <td><button class="drop-btn" data-id="{{ e.id_employee }}">Drop</button></td>
+                <td><button class="drop-btn" data-id="{{ e.id_employee }}" data-name="{{ e.name }}">Drop</button></td>
               </tr>
               {% endfor %}
             </tbody>
@@ -183,71 +260,243 @@
       </div>
     </div>
 
+    <!-- Settings Section -->
+    <div id="settings" class="section">
+      <h2>Settings</h2>
+      <div class="settings-box">
+        <h3>💰Salary Rate Configuration</h3>
+        <p>Note:
+          this salary system will only read the minute and it will convert the minutes into 
+          a currency base on below
+        </p>
+        <input type="number" id="salary-rate-input" value="{{ salary_rate }}" step="0.5" min="0">
+        <span> pesos per minute</span>
+        <br><br>
+        <button onclick="updateSalaryRate()">Save Settings</button>
+        <p id="salary-status" style="margin-top: 10px; font-size: 14px;"></p>
+      </div>
+    </div>
   </div>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal-box">
+    <h3>⚠️ Delete Employee</h3>
+    <p id="delete-message">Are you sure you want to delete this employee?</p>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+      <button class="modal-btn modal-btn-confirm" id="confirm-delete-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const socket = io();
 
-// Attendance live updates
-socket.on("attendance_update", data => {
-  const table = document.getElementById("attendance-table");
-  const row = document.createElement("tr");
-  row.innerHTML = `
-    <td>${data.name}</td>
-    <td>${data.status==="time_in"?data.time_in||"":""}</td>
-    <td>${data.status==="time_out"?data.time_out||"":""}</td>
-    <td>${data.duration||""} (Late: ${data.late_minutes||0}, Undertime: ${data.undertime_minutes||0})</td>
-    <td>${data.salary||""}</td>
-  `;
-  table.appendChild(row);
+// Connection status
+socket.on('connect', function() {
+  console.log('✓ SocketIO connected!');
 });
 
-// Section navigation
-function showSection(id){
-  document.querySelectorAll(".section").forEach(s=>s.classList.remove("show"));
-  document.getElementById(id).classList.add("show");
-  document.querySelectorAll(".sidebar ul li").forEach(li=>li.classList.remove("active"));
-  const li=Array.from(document.querySelectorAll(".sidebar ul li")).find(l=>l.textContent.toLowerCase()===id);
-  if(li) li.classList.add("active");
+socket.on('disconnect', function() {
+  console.log('✗ SocketIO disconnected');
+});
+
+// REAL-TIME ATTENDANCE UPDATE HANDLER
+socket.on("attendance_update", function(data) {
+  console.log('Real-time update:', data);
+  
+  const table = document.getElementById("attendance-table");
+  const salaryTable = document.getElementById("salary-table");
+  
+  if (data.action === "time_in") {
+    // Create NEW row for time in
+    const newRow = document.createElement("tr");
+    newRow.id = "row-" + data.record_id;
+    newRow.innerHTML = `
+      <td><strong>${data.name}</strong></td>
+      <td>${data.time_in}</td>
+      <td>${data.time_out}</td>
+      <td>${data.duration}</td>
+      <td>₱${data.salary.toFixed(2)}</td>
+      <td><span class="badge-active">Active</span></td>
+    `;
+    table.insertBefore(newRow, table.firstChild);
+    
+    // Also add to salary table
+    const salaryRow = document.createElement("tr");
+    salaryRow.id = "salary-row-" + data.record_id;
+    salaryRow.innerHTML = `
+      <td><strong>${data.name}</strong></td>
+      <td>0 min</td>
+      <td>₱0.00</td>
+      <td><span class="badge-active">Active</span></td>
+    `;
+    salaryTable.insertBefore(salaryRow, salaryTable.firstChild);
+    
+    // Update present count
+    const presentEl = document.getElementById("present-count");
+    presentEl.textContent = parseInt(presentEl.textContent) + 1;
+    
+    // Show notification
+    showToast('⏰ TIME IN', `${data.name} - ${data.time_in}`, 'info');
+    
+  } else if (data.action === "time_out") {
+    // UPDATE EXISTING ROW
+    const row = document.getElementById("row-" + data.record_id);
+    const salaryRow = document.getElementById("salary-row-" + data.record_id);
+    
+    if (row) {
+      row.innerHTML = `
+        <td><strong>${data.name}</strong></td>
+        <td>${data.time_in}</td>
+        <td>${data.time_out}</td>
+        <td>${data.duration}</td>
+        <td>₱${data.salary.toFixed(2)}</td>
+        <td><span class="badge-time-out">Completed</span></td>
+      `;
+    }
+    
+    if (salaryRow) {
+      // Convert duration to minutes for salary table
+      const durationMin = data.duration.replace('h ', 'h ').replace('m', ' min');
+      salaryRow.innerHTML = `
+        <td><strong>${data.name}</strong></td>
+        <td>${durationMin}</td>
+        <td>₱${data.salary.toFixed(2)}</td>
+        <td><span class="badge-time-out">Completed</span></td>
+      `;
+    }
+    
+    // Show notification
+    showToast('✅ TIME OUT', `${data.name} - ${data.time_out}`, 'success');
+  }
+});
+
+// Toast notification function
+function showToast(title, message, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = `toast-notification toast-${type}`;
+  toast.innerHTML = `<strong>${title}</strong><br>${message}`;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.remove();
+  }, 4000);
 }
 
-// AJAX Add Employee
-$('#employee-form').submit(function(e){
+function showSection(id) {
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("show"));
+  document.getElementById(id).classList.add("show");
+  document.querySelectorAll(".sidebar ul li").forEach(li => li.classList.remove("active"));
+  const li = Array.from(document.querySelectorAll(".sidebar ul li")).find(l => l.textContent.toLowerCase().includes(id));
+  if (li) li.classList.add("active");
+}
+
+// ============================================
+// SALARY RATE SETTINGS
+// ============================================
+function updateSalaryRate() {
+  const newRate = parseFloat(document.getElementById('salary-rate-input').value);
+  const statusEl = document.getElementById('salary-status');
+  
+  if (isNaN(newRate) || newRate < 0) {
+    statusEl.textContent = '❌ Please enter a valid number!';
+    statusEl.style.color = '#e74c3c';
+    return;
+  }
+  
+  fetch('/api/update_salary_rate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ salary_per_minute: newRate })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === 'success') {
+      statusEl.textContent = `✅ Salary rate updated to ₱${data.salary_per_minute} per minute!`;
+      statusEl.style.color = '#27ae60';
+    } else {
+      statusEl.textContent = '❌ Failed to update salary rate!';
+      statusEl.style.color = '#e74c3c';
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    statusEl.textContent = '❌ Error updating salary rate!';
+    statusEl.style.color = '#e74c3c';
+  });
+}
+
+// ============================================
+// ADD EMPLOYEE
+// ============================================
+$('#employee-form').submit(function(e) {
   e.preventDefault();
-  $.post("{{ url_for('add_employee') }}", $(this).serialize(), function(data){
+  $.post("{{ url_for('add_employee') }}", $(this).serialize(), function(data) {
     const row = `<tr>
       <td>${data.id_employee}</td>
       <td>${data.name}</td>
       <td>${data.email}</td>
       <td>${data.number}</td>
       <td>${data.rfid}</td>
-      <td><button class="drop-btn" data-id="${data.id_employee}">Drop</button></td>
+      <td><button class="drop-btn" data-id="${data.id_employee}" data-name="${data.name}">Drop</button></td>
     </tr>`;
     $('#employee-table-body').append(row);
     $('#employee-form')[0].reset();
+    showToast('✅ Employee Added', `${data.name} has been added successfully!`, 'success');
   });
 });
 
-// AJAX Drop Employee
-$(document).on('click', '.drop-btn', function(){
-    const emp_id = $(this).data('id');  // Get employee ID from button
-    const btn = $(this);
+// ============================================
+// DELETE EMPLOYEE WITH CONFIRMATION
+// ============================================
+let employeeToDelete = null;
 
-    $.post("{{ url_for('drop_employee') }}", { employ_id: emp_id }, function(res){
-        if(res.status === "success"){
-            btn.closest('tr').remove();
-            $.get("{{ url_for('admin_dashboard') }}", function(html){
-                const tempDom = $('<div>').html(html);
-                const rows = tempDom.find('#employee-table-body').html();
-                $('#employee-table-body').html(rows);
-            });
-        } else {
-            alert("Failed to delete employee");
-        }
+$(document).on('click', '.drop-btn', function() {
+  const emp_id = $(this).data('id');
+  const emp_name = $(this).data('name');
+  employeeToDelete = { id: emp_id, name: emp_name };
+  
+  document.getElementById('delete-message').innerHTML = `Are you sure you want to delete <strong>${emp_name}</strong>?`;
+  document.getElementById('delete-modal').classList.add('show');
+});
+
+function closeDeleteModal() {
+  document.getElementById('delete-modal').classList.remove('show');
+  employeeToDelete = null;
+}
+
+document.getElementById('confirm-delete-btn').addEventListener('click', function() {
+  if (employeeToDelete) {
+    const btn = $(`.drop-btn[data-id="${employeeToDelete.id}"]`);
+    
+    $.post("{{ url_for('drop_employee') }}", { employ_id: employeeToDelete.id }, function(res) {
+      if (res.status === "success") {
+        btn.closest('tr').remove();
+        closeDeleteModal();
+        showToast('✅ Employee Deleted', `${employeeToDelete.name} has been removed!`, 'success');
+        
+        // Refresh employee list
+        $.get("{{ url_for('admin_dashboard') }}", function(html) {
+          const tempDom = $('<div>').html(html);
+          const rows = tempDom.find('#employee-table-body').html();
+          $('#employee-table-body').html(rows);
+        });
+      } else {
+        closeDeleteModal();
+        showToast('❌ Delete Failed', `Unable to delete ${employeeToDelete.name}!`, 'error');
+      }
     });
+  }
+});
+
+// Close modal when clicking outside
+document.getElementById('delete-modal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeDeleteModal();
+  }
 });
 </script>
 </body>

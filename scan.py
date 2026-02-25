@@ -1,36 +1,38 @@
 import serial
 import requests
+import time
 
-# Adjust COM port and baud rate to match your Arduino
-ser = serial.Serial('COM3', 9600)
+# Change COM if needed (check in Device Manager)
+# Common ports: COM3, COM4, COM5, /dev/ttyUSB0 on Linux
+ser = serial.Serial('COM3', 9600, timeout=1)
 
-print('hello!') 
+print("=" * 50)
+print("RFID Scanner Started")
+print("Waiting for scans...")
+print("=" * 50)
 
 while True:
-    line = ser.readline().decode().strip()
-    if line.startswith("RFID Tag UID:"):
-        uid = line.replace("RFID Tag UID:", "").strip()
-        print("hello:", uid)
+    try:
+        line = ser.readline().decode().strip()
 
-        # Send UID to Flask server
-        response = requests.post("http://127.0.0.1:5000/scan", json={"uid": uid})
-# import serial
-# import requests
-#
-# # Change COM if needed (check in Device Manager)
-# ser = serial.Serial('COM3', 9600)
-#
-# print("Scanner running...")
-#
-# while True:
-#     line = ser.readline().decode().strip()
-#
-#     if line.startswith("RFID Tag UID:"):
-#         uid = line.replace("RFID Tag UID:", "").strip()
-#
-#         print("Scanned UID:", uid)
-#
-#         requests.post(
-#             "http://127.0.0.1:5000/scan",
-#             json={"uid": uid}
-#         )
+        if line.startswith("RFID Tag UID:"):
+            uid = line.replace("RFID Tag UID:", "").strip()
+            
+            print(f"\n{'='*50}")
+            print(f"SCAN DETECTED!")
+            print(f"UID: {uid}")
+            print(f"Time: {time.strftime('%Y-%m-%d %I:%M:%S %p')}")
+            print(f"{'='*50}")
+            
+            # Send to Flask server
+            response = requests.post(
+                "http://127.0.0.1:5000/scan", 
+                json={"uid": uid}
+            )
+            
+            print(f"Server Response: {response.json()}")
+            print("-" * 50)
+            
+    except Exception as e:
+        print(f"Error: {e}")
+        time.sleep(1)
